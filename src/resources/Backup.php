@@ -194,8 +194,9 @@ final class Backup {
      * enabled of the insights (2026-11-01_insight_enabled: exported as null, imported
      * shown), category_source of the transactions (2026-11-02_category_source: exported
      * as null, not imported), amount of the rules (2026-11-05_rule_amount: exported as
-     * null, not imported) and note of the budgets (2026-11-06_budget_note: exported as null, not
-     * imported).
+     * null, not imported), note of the budgets (2026-11-06_budget_note: exported as null, not
+     * imported) and comment of the transactions (2026-11-19_transaction_comment: exported as
+     * null, not imported).
      *
      * @param string $name The dataset
      * @return list<string> The columns
@@ -205,7 +206,8 @@ final class Backup {
         $columns = array_keys(BackupData::DATASETS[$name]['columns']);
         $pending = match ($name) {
             'insights' => array_merge(Insight::ready() ? [] : ['enabled'], Insight::positionReady() ? [] : ['position']),
-            'transactions' => Transaction::categorySourceReady() ? [] : ['category_source'],
+            'transactions' => array_merge(Transaction::categorySourceReady() ? [] : ['category_source'],
+                Transaction::commentReady() ? [] : ['comment']),
             'rules' => Category::amountReady() ? [] : ['amount'],
             'budgets' => Budget::noteReady() ? [] : ['note'],
             default => [],

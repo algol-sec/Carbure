@@ -2,6 +2,7 @@
 
 namespace Carbure\Lib;
 
+use Carbure\Resources\Transaction;
 use DateTime;
 use Error;
 
@@ -26,7 +27,7 @@ final class TransactionSearch
     /**
      * Reads the criteria; each one is optional, at least one is needed.
      *
-     * @param string|null $query      Text found in the label (2 characters minimum), or #tag
+     * @param string|null $query      Text found in the label or the comment (2 characters minimum), or #tag
      * @param mixed       $min        Smallest amount, without sign
      * @param mixed       $max        Largest amount, without sign
      * @param string|null $kind       "debit" (expenses) or "credit" (incomes)
@@ -75,7 +76,9 @@ final class TransactionSearch
     }
 
     /**
-     * Text in the label (stored in upper case, LIKE wildcards escaped), or the tag of this name.
+     * Text in the label (stored in upper case, LIKE wildcards escaped) or in the comment (once
+     * the migration 2026-11-19_transaction_comment is applied; case-insensitive collation),
+     * or the tag of this name.
      *
      * @param string $query Trimmed text ('' when none)
      * @throws Error If it is shorter than 2 characters (400)
@@ -93,7 +96,12 @@ final class TransactionSearch
                 's', mb_strtolower(ltrim($query, '#')));
             return;
         }
-        $this->add("b.label LIKE ?", 's', '%' . addcslashes(strtoupper($query), '%_\\') . '%');
+        $like = '%' . addcslashes(strtoupper($query), '%_\\') . '%';
+        if (Transaction::commentReady()) {
+            $this->add("(b.label LIKE ? OR b.comment LIKE ?)", 'ss', $like, $like);
+            return;
+        }
+        $this->add("b.label LIKE ?", 's', $like);
     }
 
     /**

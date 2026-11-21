@@ -66,6 +66,12 @@ final class Transaction {
     /** Whether the migration 2026-11-02_category_source is applied (read once per request) */
     private static ?bool $sourceReady = null;
 
+    /** Longest comment of a transaction, in characters */
+    public const COMMENT_LENGTH = 500;
+
+    /** Whether the migration 2026-11-19_transaction_comment is applied (read once per request) */
+    private static ?bool $commentReady = null;
+
     /** SQL amount of the transaction t as the bank gave it: its own one plus the one of its parts */
     const BANK_AMOUNT = "(t.amount + COALESCE((SELECT SUM(p.amount) FROM bank_transaction p WHERE p.split_of = t.id), 0))";
     
@@ -79,6 +85,19 @@ final class Transaction {
     {
         return self::$sourceReady ??= Db::queryOne("SELECT 1 FROM information_schema.COLUMNS
             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'bank_transaction' AND COLUMN_NAME = 'category_source'", "") !== null;
+    }
+
+    /**
+     * Check if the transactions have their comment: the migration
+     * 2026-11-19_transaction_comment is applied (before it, the column does not exist and
+     * the transactions are returned without comment).
+     *
+     * @return bool
+     */
+    public static function commentReady(): bool
+    {
+        return self::$commentReady ??= Db::queryOne("SELECT 1 FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'bank_transaction' AND COLUMN_NAME = 'comment'", "") !== null;
     }
 
     /**
@@ -139,11 +158,11 @@ final class Transaction {
     }
 
     /**
-     * Search transactions of every period, most recent first: by label ("#name" gives the
+     * Search transactions of every period, most recent first: by label or comment ("#name" gives the
      * transactions of the tag of this name) and by the criteria of the advanced search. Each
      * criterion is optional, at least one is needed.
      *
-     * @param string|null           $query      The text to find in the label (2 characters minimum), or #tag
+     * @param string|null           $query      The text to find in the label or the comment (2 characters minimum), or #tag
      * @param int|string            $limit      The maximum number of transactions (1 to 500)
      * @param int|float|string|null $min        Smallest amount, without sign (50: an expense of -50 or an income of 50)
      * @param int|float|string|null $max        Largest amount, without sign
@@ -1048,6 +1067,75 @@ final class Transaction {
     }
 
     /**
+     * Set the free-text comment of a transaction (synchronized, imported, entered by hand or
+     * a part of a split one). The synchronization and the import never change it.
+     *
+     * @param int|string  $id      The id of the transaction
+     * @param string|null $comment The comment (500 characters at most, trimmed); "" or null removes it
+     * @return array<string, mixed> The transaction, with the ids of its tags
+     * @throws Error If the transaction does not exist (404), the comment is too long (400), or
+     *               sent before the migration 2026-11-19_transaction_comment (409)
+     */
+    #[ApiRoute('/transaction/comment', method: 'PUT', changes: ['transactions'])]
+    public static function updateComment(int|string $id, ?string $comment = null): array
+    {
+        $transaction = self::manualRow($id);
+        self::saveComment($transaction['id'], self::commentToStore($comment));
+        return Tag::withTags([self::manualRow($id)])[0];
+    }
+
+    /**
+     * A comment sent by a user, checked before anything is written: trimmed, null when empty
+     * or not sent.
+     *
+     * @param string|null $comment The comment sent
+     * @return string|null The comment to store, null for none
+     * @throws Error If it is too long (400), or not empty before the migration
+     *               2026-11-19_transaction_comment (409)
+     */
+    private static function commentToStore(?string $comment): ?string
+    {
+        $comment = self::comment((string)$comment);
+        if ($comment !== null && !self::commentReady()) {
+            throw new ApiError("The comment of the transactions needs the pending database migrations", 409,
+                'transaction_comment_migration');
+        }
+        return $comment;
+    }
+
+    /**
+     * Store the comment of a transaction (nothing to store before the migration
+     * 2026-11-19_transaction_comment: commentToStore() only lets null through then).
+     *
+     * @param mixed       $id      The id of the transaction
+     * @param string|null $comment The comment checked by commentToStore(), null for none
+     * @return void
+     */
+    private static function saveComment(mixed $id, ?string $comment): void
+    {
+        if (self::commentReady()) {
+            Db::execute("UPDATE bank_transaction SET comment = ? WHERE id = ?", "si", $comment, $id);
+        }
+    }
+
+    /**
+     * A comment of a transaction as stored: trimmed, null when empty.
+     *
+     * @param string $comment The comment sent
+     * @return string|null The comment, null for none
+     * @throws Error If it is longer than COMMENT_LENGTH characters (400)
+     */
+    private static function comment(string $comment): ?string
+    {
+        $comment = trim($comment);
+        if (mb_strlen($comment) > self::COMMENT_LENGTH) {
+            throw new ApiError("The comment of a transaction has " . self::COMMENT_LENGTH . " characters at most", 400,
+                'transaction_comment_length', ['max' => self::COMMENT_LENGTH]);
+        }
+        return $comment === '' ? null : $comment;
+    }
+
+    /**
      * Change the date a transaction is counted on (its month, for the totals and the
      * budgets), synchronized or not: the real date of the bank (rdate) and the UUID are
      * kept, so that a synchronization or an import merges it again without changing this
@@ -1208,18 +1296,22 @@ final class Transaction {
      * @param string          $label    Its label
      * @param int|float|string $amount  Its amount: negative for an expense
      * @param int|string|null $category Its category (optional: the rules, else none)
+     * @param string|null     $comment  Its comment (optional, 500 characters at most)
      * @return array<string, mixed> The transaction
-     * @throws Error If a value is invalid (400) or the account or the category does not exist (404)
+     * @throws Error If a value is invalid (400), the account or the category does not exist (404),
+     *               or a comment is sent before the migration 2026-11-19_transaction_comment (409)
      */
     #[ApiRoute('/transaction', method: 'POST', changes: ['transactions'])]
     public static function createManual(int|string $account, string $date, string $label, int|float|string $amount,
-                                  int|string|null $category = null): array
+                                  int|string|null $category = null, ?string $comment = null): array
     {
         $bank = Db::queryOne("SELECT account_number, bank_name FROM bank_account WHERE id = ?", "i", $account);
         if (!$bank) {
             throw new ApiError("Account not found", 404, 'account_not_found');
         }
         $fields = self::manualFields($date, $label, $amount);
+        // Checked before the insert: a refused comment enters nothing
+        $comment = self::commentToStore($comment);
         $chosen = $category !== null && $category !== '';
         $category = $chosen ? self::existingCategory($category) : (Category::find($fields['label'], null, $fields['amount']) ?? 0);
         $source = $chosen ? self::SOURCE_MANUAL : ($category !== 0 ? self::SOURCE_RULE : null);
@@ -1227,6 +1319,9 @@ final class Transaction {
         $id = self::insertRow(['split_of' => null, 'uuid' => self::manualUuid(), 'rdate' => $fields['date'],
             'type' => 8, 'category' => $category, 'category_source' => $source, 'card' => '', 'bank_name' => $bank['bank_name'],
             'account_number' => $bank['account_number'], 'pointed' => 1, 'user' => (int)Jwt::getUserIdFromToken()] + $fields);
+        if ($comment !== null) {
+            self::saveComment($id, $comment);
+        }
         if (substr($fields['date'], 0, 7) === date('Y-m')) {
             BudgetAlert::check();
             InsightAlert::check();
@@ -1242,12 +1337,15 @@ final class Transaction {
      * @param string|null           $date   Its new date (YYYY-MM-DD)
      * @param string|null           $label  Its new label
      * @param int|float|string|null $amount Its new amount
+     * @param string|null           $comment Its new comment (500 characters at most): "" removes it,
+     *                                       null (not sent: mobile apps) keeps the current one
      * @return array<string, mixed> The transaction
-     * @throws Error If it does not exist (404), was not entered by hand or a value is invalid (400)
+     * @throws Error If it does not exist (404), was not entered by hand or a value is invalid (400),
+     *               or a comment is sent before the migration 2026-11-19_transaction_comment (409)
      */
     #[ApiRoute('/transaction', method: 'PUT', changes: ['transactions'])]
     public static function updateManual(int|string $id, ?string $date = null, ?string $label = null,
-                                  int|float|string|null $amount = null): array
+                                  int|float|string|null $amount = null, ?string $comment = null): array
     {
         $transaction = self::manualRow($id);
         if (!self::enteredByHand($transaction)) {
@@ -1259,11 +1357,15 @@ final class Transaction {
             && Db::queryOne("SELECT id FROM bank_transaction WHERE split_of = ? LIMIT 1", "i", $id)) {
             throw new ApiError("The amount of a split transaction cannot be changed", 400, 'transaction_split_amount');
         }
+        $stored = self::commentToStore($comment);
 
         Db::execute("UPDATE bank_transaction SET date = ?, rdate = ?, label = ?, amount = ? WHERE id = ?", "ssssi",
             $fields['date'], $fields['date'], $fields['label'], $fields['amount'], $id);
         Db::execute("UPDATE bank_transaction SET date = ?, rdate = ?, label = ? WHERE split_of = ?", "sssi",
             $fields['date'], $fields['date'], $fields['label'], $id);
+        if ($comment !== null) {
+            self::saveComment($id, $stored);
+        }
         return Tag::withTags([self::manualRow($id)])[0];
     }
 

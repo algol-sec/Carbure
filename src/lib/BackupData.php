@@ -100,6 +100,8 @@ final class BackupData {
                 'pointed' => 'bool', 'user' => 'user',
                 // Added with the migration 2026-11-02_category_source: unknown in an older backup
                 'category_source' => '?enum:rule|manual',
+                // Added with the migration 2026-11-19_transaction_comment: no comment in an older backup
+                'comment' => '?string:500',
             ],
         ],
         'deleted_transactions' => [
