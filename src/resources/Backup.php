@@ -204,14 +204,15 @@ final class Backup {
     private static function columns(string $name): array
     {
         $columns = array_keys(BackupData::DATASETS[$name]['columns']);
-        $pending = match ($name) {
-            'insights' => array_merge(Insight::ready() ? [] : ['enabled'], Insight::positionReady() ? [] : ['position']),
-            'transactions' => array_merge(Transaction::categorySourceReady() ? [] : ['category_source'],
-                Transaction::commentReady() ? [] : ['comment']),
-            'rules' => Category::amountReady() ? [] : ['amount'],
-            'budgets' => Budget::noteReady() ? [] : ['note'],
+        // Each column of a migration, with the check that it is applied
+        $migrated = match ($name) {
+            'insights' => ['enabled' => Insight::ready(...), 'position' => Insight::positionReady(...)],
+            'transactions' => ['category_source' => Transaction::categorySourceReady(...), 'comment' => Transaction::commentReady(...)],
+            'rules' => ['amount' => Category::amountReady(...)],
+            'budgets' => ['note' => Budget::noteReady(...)],
             default => [],
         };
+        $pending = array_keys(array_filter($migrated, fn(callable $ready): bool => !$ready()));
         return array_values(array_diff($columns, $pending));
     }
 
