@@ -139,6 +139,25 @@ test('filters the transactions not checked yet', async ({ adminPage: page }) => 
     await expect(page.locator('.transaction-item')).toHaveCount(6);
 });
 
+test('filters the transactions without a category', async ({ adminPage: page }) => {
+    const toggle = page.locator('.toggle-uncategorized');
+    await expect(toggle.locator('.toggle-label')).toHaveText(tr('uncategorizedCount', { count: 1 }));
+
+    await toggle.click();
+    await expect(toggle.getByRole('switch')).toBeChecked();
+    await expect(page.locator('.transaction-item')).toHaveCount(1);
+    await expect(row(page, 'CB BOULANGERIE PAUL')).toBeVisible();
+
+    // Once categorized, it leaves the filtered list
+    await pickCategory(row(page, 'CB BOULANGERIE PAUL'), 'Alimentation');
+    await expect(page.locator('.transaction-item')).toHaveCount(0);
+    await expect(page.locator('.transactions-hint')).toHaveText(tr('allCategorized'));
+    await expect(toggle.locator('.toggle-label')).toHaveText(tr('uncategorizedCount', { count: 0 }));
+
+    await toggle.click();
+    await expect(page.locator('.transaction-item')).toHaveCount(6);
+});
+
 test('checks and unchecks a transaction', async ({ adminPage: page, api }) => {
     const transaction = row(page, 'CB SUPERMARCHE CASINO');
     await transaction.getByRole('button', { name: tr('checkTransaction') }).click();
@@ -301,6 +320,41 @@ test('deletes the selected transactions (#421)', async ({ adminPage: page, api }
     const { month, year } = currentMonth();
     const labels = (await (await api.get(`/api/transaction?month=${month}&year=${year}`)).json()).map(t => t.label);
     expect(labels).not.toContain('CB RESTAURANT LE PETIT ZINC');
+});
+
+test('changes the category of the selected transactions from one of them, and checks them', async ({ adminPage: page, api }) => {
+    await page.getByRole('button', { name: tr('tagSelect'), exact: true }).click();
+    const bar = page.getByRole('region', { name: tr('tagSelect') });
+    // Not selected: a categorized transaction keeps its chip, no picker in the bar
+    await expect(row(page, 'CB RESTAURANT LE PETIT ZINC').locator('.category-picker')).toHaveCount(0);
+    await expect(bar.locator('.category-picker')).toHaveCount(0);
+
+    await page.getByLabel(tr('tagSelectTransaction', { label: 'CB BOULANGERIE PAUL' })).check();
+    await page.getByLabel(tr('tagSelectTransaction', { label: 'CB RESTAURANT LE PETIT ZINC' })).check();
+    // Selected: its category is a picker, which changes the whole selection
+    const restaurant = row(page, 'CB RESTAURANT LE PETIT ZINC');
+    await expect(restaurant.locator('.transaction-category')).toHaveAttribute('title', tr('selectionCategoryHelp', { count: 2 }));
+    await expect(restaurant.locator('.category-picker-name')).toContainText('Restaurant');
+    await pickCategory(restaurant, 'Alimentation');
+
+    await expect(page.locator('.toast')).toHaveText(tr('selectionCategorized', { count: 2, name: 'Alimentation' }));
+    // The selection stays, both show the new category
+    await expect(bar.locator('.tag-selection-count')).toHaveText(tr('tagSelected', { count: 2 }));
+    for (const label of ['CB BOULANGERIE PAUL', 'CB RESTAURANT LE PETIT ZINC']) {
+        await expect(row(page, label).locator('.category-picker-name')).toContainText('Alimentation');
+    }
+    await bar.getByRole('button', { name: tr('selectionClose') }).click();
+    for (const label of ['CB BOULANGERIE PAUL', 'CB RESTAURANT LE PETIT ZINC']) {
+        await expect(row(page, label).locator('.category-chip')).toHaveText('Alimentation');
+    }
+    // The others did not change
+    await expect(row(page, 'CB SUPERMARCHE CASINO').locator('.category-chip')).toHaveText('Supermarché');
+
+    const { month, year } = currentMonth();
+    const saved = (await (await api.get(`/api/transaction?month=${month}&year=${year}`)).json())
+        .filter(t => ['CB BOULANGERIE PAUL', 'CB RESTAURANT LE PETIT ZINC'].includes(t.label));
+    expect(new Set(saved.map(t => Number(t.category))).size).toBe(1);
+    expect(saved.map(t => [Number(t.pointed), t.category_source])).toEqual([[1, 'manual'], [1, 'manual']]);
 });
 
 test('selects all the transactions shown, then closes the selection (#430)', async ({ adminPage: page }) => {

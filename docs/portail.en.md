@@ -134,13 +134,15 @@ taskbar or the home screen.
   operation type if they are not categorized), label, date and amount.
 - **Checking**: the round button on the left of each transaction marks it as checked
   (green tick) or unchecked. Unchecked transactions are in bold.
-- **Filter**: next to the number of transactions, a switch limits the list to
-  unchecked transactions (with their number).
+- **Filters**: next to the number of transactions, a switch limits the list to
+  unchecked transactions, another one to the transactions of the month **without a
+  category** (each with their number); they combine. A transaction leaves the filtered
+  list as soon as it is categorized.
 - **Recurring transactions**: those found every month (salary, rent,
   subscriptions, bills, `GET /transaction/recurring`) carry the "Monthly" badge. Their
   bar, at the top of the list like the selection one, is folded by default (only their
   number); its chevron unfolds it, a choice remembered by the browser: received and
-  expected, "Recurring transactions total", and a second switch that shows only them and
+  expected, "Recurring transactions total", and a switch that shows only them and
   lists those that have not arrived yet ("Expected this month", with their usual day and
   amount, "≈" if it varies; "Missing this month" for a past month). Folding it removes
   that filter. The bar does not appear during a search.
@@ -153,7 +155,7 @@ taskbar or the home screen.
   transactions.
 - **Search**: the search field (2 characters minimum) queries
   `GET /transaction/search` across all months and shows the **total** of the transactions
-  found; the filter also applies to the results. The cross clears the search.
+  found; the filters (unchecked, without a category) also apply to the results. The cross clears the search.
 - **Manual categorization**: a transaction without a category offers a
   "Categorize…" picker (icons, colors, search); the transaction is also checked. This
   picker, like those of the detail, of the manual entry and of the split, shows first the
@@ -163,6 +165,9 @@ taskbar or the home screen.
   then offers to **Create a rule** to classify this label automatically: it opens
   the Rules tab with the label and the category pre-filled, the keyword can be
   shortened (dates, card numbers…).
+  In **Select** mode, every ticked transaction shows this picker: the category chosen on one
+  of them applies to every ticked transaction (they are also checked; no rule offered), and
+  the selection stays.
 - **Transaction details**: a click (or Enter) on the label opens a window with
   the amount, the full label, the dates, the type, the card, the bank (synchronized account
   or imported statement) and the import date; the
@@ -305,7 +310,9 @@ Sample queries are in [Insight recipes](insights.md).
 
 ![Trends screen of the Carbure web portal](assets/screenshot-trends.webp)
 
-- Period of **3, 6 or 12 months** ending with the current month.
+- Period of **3, 6, 12, 24, 36 or 60 months** ending with the current month, or
+  **Custom**: from a chosen month to a chosen month (the current month at the latest, 240
+  months at most). Beyond 12 months, the axis shows only some of the months, then the years.
 - **Compare with**: no comparison, the previous period or the same period last
   year.
 - **Key figures**: total savings, average savings per month, savings rate,
@@ -319,6 +326,17 @@ Sample queries are in [Insight recipes](insights.md).
   sub-categories, minus withdrawals (blue bars, red for a month of net withdrawal).
   The category name is set with `savings_category` (case and accents ignored). The
   savings rate is `savings / income`.
+- **By category**: every category of a type (Expenses, Income, Off-budget selector) on
+  one chart, main categories (subcategories included) or subcategories. One chip per
+  category, largest first, hides or shows it again; **All** and **None** show or hide them
+  all. **Lines**, **Bars** (stacked) and **Areas** (stacked) buttons; the scale covers the
+  categories shown, the tooltip gives the amount of each and their total. These choices are
+  remembered by the browser.
+- **Custom charts**: one chart per chosen category (subcategories included), subcategory
+  or insight, as monthly bars, lines or areas (the choice of the By category card) with the
+  average of the period, the planned budget
+  (categories) and a tooltip on hover. Administrators add them (**Add a chart**, 12 at
+  most), move and remove them; the list is shared by the household.
 - **Table** view of the data month by month.
 
 ## Tags { #tags }
@@ -389,7 +407,8 @@ the chosen category.
 
 Tree of categories (one level of sub-categories) grouped by type (expenses,
 income, off-budget). **+** adds a category, the pencil edits it (in a modal),
-the trash deletes it. The icon and the color are chosen among those that
+the trash deletes it. The **+** of a top-level category row adds a
+sub-category: the modal opens with this parent and its type already chosen. The icon and the color are chosen among those that
 the mobile apps can display, with a preview. Deleting a category moves its
 transactions to "Uncategorized" and deletes its budgets and rules; a category that has
 sub-categories cannot be deleted. The "Uncategorized" category (0) is
