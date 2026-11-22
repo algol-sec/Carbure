@@ -134,13 +134,15 @@ taskbar or the home screen.
   operation type if they are not categorized), label, date and amount.
 - **Checking**: the round button on the left of each transaction marks it as checked
   (green tick) or unchecked. Unchecked transactions are in bold.
-- **Filter**: next to the number of transactions, a switch limits the list to
-  unchecked transactions (with their number).
+- **Filters**: next to the number of transactions, a switch limits the list to
+  unchecked transactions, another one to the transactions of the month **without a
+  category** (each with their number); they combine. A transaction leaves the filtered
+  list as soon as it is categorized.
 - **Recurring transactions**: those found every month (salary, rent,
   subscriptions, bills, `GET /transaction/recurring`) carry the "Monthly" badge. Their
   bar, at the top of the list like the selection one, is folded by default (only their
   number); its chevron unfolds it, a choice remembered by the browser: received and
-  expected, "Recurring transactions total", and a second switch that shows only them and
+  expected, "Recurring transactions total", and a switch that shows only them and
   lists those that have not arrived yet ("Expected this month", with their usual day and
   amount, "≈" if it varies; "Missing this month" for a past month). Folding it removes
   that filter. The bar does not appear during a search.
@@ -153,7 +155,7 @@ taskbar or the home screen.
   transactions.
 - **Search**: the search field (2 characters minimum) queries
   `GET /transaction/search` across all months and shows the **total** of the transactions
-  found; the filter also applies to the results. The cross clears the search.
+  found; the filters (unchecked, without a category) also apply to the results. The cross clears the search.
 - **Manual categorization**: a transaction without a category offers a
   "Categorize…" picker (icons, colors, search); the transaction is also checked. This
   picker, like those of the detail, of the manual entry and of the split, shows first the

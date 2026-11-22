@@ -136,13 +136,15 @@ tâches ou l'écran d'accueil.
   type d'opération si elles ne sont pas catégorisées), libellé, date et montant.
 - **Pointage** : le bouton rond à gauche de chaque transaction la marque comme vérifiée
   (coche verte) ou non vérifiée. Les transactions non vérifiées sont en gras.
-- **Filtre** : à côté du nombre de transactions, un interrupteur limite la liste aux
-  transactions non vérifiées (avec leur nombre).
+- **Filtres** : à côté du nombre de transactions, un interrupteur limite la liste aux
+  transactions non vérifiées, un autre aux transactions **sans catégorie** du mois (chacun
+  avec leur nombre) ; ils se combinent. Une transaction catégorisée quitte aussitôt la
+  liste filtrée.
 - **Transactions récurrentes** : celles retrouvées chaque mois (salaire, loyer,
   abonnements, factures, `GET /transaction/recurring`) portent le badge « Mensuelle ». Leur
   barre, en haut de la liste comme celle de la sélection, est repliée par défaut (leur
   nombre seul) ; son chevron la déplie, choix retenu par le navigateur : reçues et
-  attendues, « Total des transactions récurrentes », et un second interrupteur qui
+  attendues, « Total des transactions récurrentes », et un interrupteur qui
   n'affiche qu'elles et liste celles qui ne sont pas encore arrivées (« Attendues ce
   mois-ci », avec leur jour habituel et leur montant, « ≈ » s'il varie ; « Absentes ce
   mois-ci » pour un mois passé). La replier retire ce filtre. La barre n'apparaît pas
@@ -156,7 +158,7 @@ tâches ou l'écran d'accueil.
   des récurrentes.
 - **Recherche** : le champ de recherche (2 caractères minimum) interroge
   `GET /transaction/search` sur tous les mois et affiche le **total** des transactions
-  trouvées ; le filtre s'applique aussi aux résultats. La croix efface la recherche.
+  trouvées ; les filtres (non vérifiées, sans catégorie) s'appliquent aussi aux résultats. La croix efface la recherche.
 - **Catégorisation manuelle** : une transaction sans catégorie propose un sélecteur
   « Catégoriser… » (icônes, couleurs, recherche) ; la transaction est aussi pointée. Ce
   sélecteur, comme ceux du détail, de la saisie manuelle et de la répartition, présente
