@@ -171,15 +171,18 @@ final class Transaction {
      * @param string|null           $accounts   Accounts, comma-separated bankIds (account_number@bank_name, see GET /bank)
      * @param string|null           $from       First day (YYYY-MM-DD)
      * @param string|null           $to         Last day (YYYY-MM-DD)
+     * @param string|null           $in         "label": the text in the label only, not in the comment
+     *                                          (the transactions similar to one); else both
      * @return list<array<string, mixed>> The list of transactions, with the ids of their tags
      * @throws Error If there is no criterion, the query is too short or a criterion is invalid (400)
      */
     #[ApiRoute('/transaction/search', method: 'GET')]
     public static function search(?string $query = null, int|string $limit = 100, int|float|string|null $min = null,
         int|float|string|null $max = null, ?string $kind = null, ?string $categories = null, ?string $accounts = null,
-        ?string $from = null, ?string $to = null): array
+        ?string $from = null, ?string $to = null, ?string $in = null): array
     {
-        [$where, $types, $params] = (new TransactionSearch($query, $min, $max, $kind, $categories, $accounts, $from, $to))->where();
+        [$where, $types, $params] = (new TransactionSearch($query, $min, $max, $kind, $categories, $accounts, $from, $to,
+            $in === 'label'))->where();
         $limit = max(1, min(500, (int)$limit));
 
         $sql = "SELECT b.* FROM bank_transaction b WHERE $where ORDER BY b.date DESC, b.rdate DESC LIMIT ?";
@@ -1304,13 +1307,21 @@ final class Transaction {
     {
         $id = (int)$transaction['id'];
         $rest = (int)$transaction['bank_cents'] - array_sum(array_column($parts, 1));
+        // The parts are re-created: their comments follow them, by their UUID (same index)
+        $comments = [];
+        if (self::commentReady()) {
+            foreach (Db::select("SELECT uuid, comment FROM bank_transaction WHERE split_of = ? AND comment IS NOT NULL", "i", $id) as $row) {
+                $comments[$row['uuid']] = $row['comment'];
+            }
+        }
         $db = Db::getConnection();
         $db->begin_transaction();
         try {
             Db::execute("DELETE FROM bank_transaction WHERE split_of = ?", "i", $id);
             Db::execute("UPDATE bank_transaction SET amount = ? WHERE id = ?", "si", sprintf('%.2f', $rest / 100), $id);
             foreach ($parts as $index => [$category, $cents]) {
-                $part = self::insertRow(['split_of' => $id, 'uuid' => md5($transaction['uuid'] . '#split' . ($index + 1)),
+                $uuid = md5($transaction['uuid'] . '#split' . ($index + 1));
+                $part = self::insertRow(['split_of' => $id, 'uuid' => $uuid, 'comment' => $comments[$uuid] ?? null,
                     'category' => $category, 'category_source' => self::SOURCE_MANUAL,
                     'amount' => sprintf('%.2f', $cents / 100)] + $transaction);
                 // A part of a project stays in it; its tags may then change apart
@@ -1356,10 +1367,8 @@ final class Transaction {
 
         $id = self::insertRow(['split_of' => null, 'uuid' => self::manualUuid(), 'rdate' => $fields['date'],
             'type' => 8, 'category' => $category, 'category_source' => $source, 'card' => '', 'bank_name' => $bank['bank_name'],
-            'account_number' => $bank['account_number'], 'pointed' => 1, 'user' => (int)Jwt::getUserIdFromToken()] + $fields);
-        if ($comment !== null) {
-            self::saveComment($id, $comment);
-        }
+            'account_number' => $bank['account_number'], 'pointed' => 1, 'user' => (int)Jwt::getUserIdFromToken(),
+            'comment' => $comment] + $fields);
         if (substr($fields['date'], 0, 7) === date('Y-m')) {
             BudgetAlert::check();
             InsightAlert::check();
@@ -1491,17 +1500,23 @@ final class Transaction {
      * Insert a transaction that does not come from a bank (a part of a split one, one entered by hand).
      *
      * @param array<string, mixed> $row split_of, uuid, date, rdate, type, label (cleaned), category,
-     *                                  category_source, amount, card, bank_name, account_number, pointed, user
+     *                                  category_source, amount, card, bank_name, account_number, pointed, user,
+     *                                  comment (checked by commentToStore(), null for none)
      * @return int The id of the transaction
      */
     private static function insertRow(array $row): int
     {
+        // In the same INSERT: a transaction is never stored without its comment
+        $comment = self::commentReady() ? ", comment = ?" : "";
         $sql = "INSERT INTO bank_transaction SET split_of = ?, uuid = ?, date = ?, rdate = ?, type = ?, label = ?,
                     category = ?" . self::sourceSql($row['category_source'] ?? null) . ", amount = ?, card = ?,
-                    bank_name = ?, account_number = ?, pointed = ?, user = ?";
-        $stmt = Db::execute($sql, "isssisissssii", $row['split_of'], $row['uuid'], $row['date'], $row['rdate'],
-            $row['type'], $row['label'], $row['category'], $row['amount'], $row['card'], $row['bank_name'],
-            $row['account_number'], $row['pointed'], $row['user']);
+                    bank_name = ?, account_number = ?, pointed = ?, user = ?" . $comment;
+        $params = [$row['split_of'], $row['uuid'], $row['date'], $row['rdate'], $row['type'], $row['label'],
+            $row['category'], $row['amount'], $row['card'], $row['bank_name'], $row['account_number'], $row['pointed'], $row['user']];
+        if ($comment !== '') {
+            $params[] = $row['comment'] ?? null;
+        }
+        $stmt = Db::execute($sql, "isssisissssii" . ($comment !== '' ? 's' : ''), ...$params);
         return (int)$stmt->insert_id;
     }
 

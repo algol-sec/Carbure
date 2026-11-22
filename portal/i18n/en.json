@@ -661,7 +661,7 @@
     "recurringStatus_expected": "Expected",
     "recurringStatus_late": "Late",
     "recurringStatus_missing": "Missing",
-    "searchPlaceholder": "Search a label…",
+    "searchPlaceholder": "Search a label or a comment…",
     "searchResultsTitle": "Search results",
     "clearSearch": "Clear search",
     "advancedSearch": "Advanced search",

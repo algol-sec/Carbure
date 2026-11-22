@@ -661,7 +661,7 @@
     "recurringStatus_expected": "Attendue",
     "recurringStatus_late": "En retard",
     "recurringStatus_missing": "Absente",
-    "searchPlaceholder": "Rechercher un libellé…",
+    "searchPlaceholder": "Rechercher un libellé ou un commentaire…",
     "searchResultsTitle": "Résultats de recherche",
     "clearSearch": "Effacer la recherche",
     "advancedSearch": "Recherche avancée",

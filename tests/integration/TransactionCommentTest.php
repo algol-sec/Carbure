@@ -190,6 +190,13 @@ class TransactionCommentTest extends DatabaseTestCase
         Transaction::updateComment($part, 'Pharmacie');
         $this->assertSame('Pharmacie', Db::queryOne("SELECT comment FROM bank_transaction WHERE id = ?", "i", $part)['comment']);
         $this->assertSame('Courses + pharmacie', $this->row('u1')['comment']);
+
+        // Split again (the parts are re-created): each part keeps its comment, by its place
+        Transaction::split($id, [['category' => 1, 'amount' => '-25'], ['category' => 3, 'amount' => '-15'], ['category' => 2, 'amount' => '-5']]);
+        $parts = Db::select("SELECT comment FROM bank_transaction WHERE split_of = ? ORDER BY id", "i", $id)->fetch_all(MYSQLI_ASSOC);
+        // $rows[1] (the original one comes first) is the first part
+        $this->assertSame(['Pharmacie', null, null], array_column($parts, 'comment'));
+        $this->assertSame('Courses + pharmacie', $this->row('u1')['comment']);
     }
 
     public function testTheSearchFindsTheComment()
@@ -204,6 +211,11 @@ class TransactionCommentTest extends DatabaseTestCase
         $this->assertContains('u1', array_column(Transaction::search('supermarche'), 'uuid'));
         // With another criterion
         $this->assertSame([], Transaction::search('anniversaire', 100, null, null, 'credit'));
+        // The transactions similar to one: in the label only, a comment naming the merchant is not one
+        $this->assertSame([], Transaction::search('anniversaire', in: 'label'));
+        Transaction::updateComment($this->row('u4')['id'], 'Remboursement SUPERMARCHE');
+        $this->assertContains('u4', array_column(Transaction::search('supermarche'), 'uuid'));
+        $this->assertNotContains('u4', array_column(Transaction::search('supermarche', in: 'label'), 'uuid'));
     }
 
     public function testTheBackupKeepsTheComment()
@@ -216,6 +228,15 @@ class TransactionCommentTest extends DatabaseTestCase
         Db::query("UPDATE bank_transaction SET comment = NULL");
         Backup::import($before);
         $this->assertSame('Facture annuelle', $this->row('u2')['comment']);
+
+        // Stored like the API does: trimmed, an empty one is none
+        $edited = $before['transactions'];
+        foreach ($edited as &$t) {
+            $t['comment'] = ['u1' => '  ', 'u2' => '  Facture  ', 'u3' => '0'][$t['uuid']] ?? $t['comment'];
+        }
+        unset($t);
+        Backup::import(['transactions' => $edited]);
+        $this->assertSame([null, 'Facture', '0'], [$this->row('u1')['comment'], $this->row('u2')['comment'], $this->row('u3')['comment']]);
 
         // An older backup, without comment: none
         $older = array_map(function ($t) { unset($t['comment']); return $t; }, $before['transactions']);

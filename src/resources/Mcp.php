@@ -518,8 +518,9 @@ final class Mcp {
             'tables' => [
                 'bank_transaction' => 'date (debit date: the month displayed), rdate (actual date of the payment), type (see transaction_types), label, '
                     . 'category (bank_transaction_category.id, 0 = uncategorized), amount (negative = expense), pointed (1 = checked), '
-                    . 'bank_name, account_number, split_of (a part of a split transaction: id of the original one, otherwise NULL), '
-                    . 'comment (free text written by the household, NULL if none)',
+                    . 'bank_name, account_number, split_of (a part of a split transaction: id of the original one, otherwise NULL)'
+                    // The column exists once the migration 2026-11-19_transaction_comment is applied
+                    . (Transaction::commentReady() ? ', comment (free text written by the household, NULL if none)' : ''),
                 'bank_transaction_category' => 'id, name, parent_category (0 = main category), type: DEBIT (expense), CREDIT (income) or HORS-BUDGET (off-budget: savings, internal transfers)',
                 'bank_transaction_category_keyword' => 'keyword, category, notify: categorization rules (a label containing the keyword gets the category)',
                 'budget' => 'category, amount (planned, positive), date (first day of the month)',

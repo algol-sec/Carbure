@@ -661,7 +661,7 @@
     "recurringStatus_expected": "Erwartet",
     "recurringStatus_late": "Verspätet",
     "recurringStatus_missing": "Fehlt",
-    "searchPlaceholder": "Buchungstext suchen…",
+    "searchPlaceholder": "Buchungstext oder Kommentar suchen…",
     "searchResultsTitle": "Suchergebnisse",
     "clearSearch": "Suche löschen",
     "advancedSearch": "Erweiterte Suche",

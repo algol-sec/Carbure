@@ -644,6 +644,7 @@ faut au moins un (`400 search_too_short` sinon).
 |---|---|---|
 | `query` | non | Texte recherché dans le libellé ou le commentaire (2 caractères minimum, insensible à la casse) ; `#nom` : les transactions du tag |
 | `min`, `max` | non | Montant minimal et maximal, sans signe : `min=50` trouve une dépense de -50 comme un revenu de 50 (`400 search_amount_invalid` si négatif ou `min` > `max`) |
+| `in` | non | `label` : le texte de `query` dans le libellé seulement, pas dans le commentaire (transactions similaires à une autre) |
 | `kind` | non | `debit` : dépenses seules, `credit` : revenus seuls |
 | `categories` | non | Ids de catégories séparés par des virgules ; une catégorie inclut ses sous-catégories |
 | `accounts` | non | Comptes séparés par des virgules, sous la forme `bankId` de `GET /bank` (`numéro@banque`) |

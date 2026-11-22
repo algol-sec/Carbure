@@ -641,6 +641,7 @@ needed (`400 search_too_short` otherwise).
 |---|---|---|
 | `query` | no | Text searched in the label or the comment (2 characters minimum, case-insensitive); `#name`: the transactions of the tag |
 | `min`, `max` | no | Smallest and largest amount, without sign: `min=50` finds an expense of -50 as well as an income of 50 (`400 search_amount_invalid` if negative or `min` > `max`) |
+| `in` | no | `label`: the text of `query` in the label only, not in the comment (transactions similar to another one) |
 | `kind` | no | `debit`: expenses only, `credit`: incomes only |
 | `categories` | no | Comma-separated category ids; a category includes its sub-categories |
 | `accounts` | no | Comma-separated accounts, as the `bankId` of `GET /bank` (`number@bank`) |

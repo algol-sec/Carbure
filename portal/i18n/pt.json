@@ -661,7 +661,7 @@
     "recurringStatus_expected": "Prevista",
     "recurringStatus_late": "Atrasada",
     "recurringStatus_missing": "Ausente",
-    "searchPlaceholder": "Procurar um descritivo…",
+    "searchPlaceholder": "Procurar um descritivo ou um comentário…",
     "searchResultsTitle": "Resultados da pesquisa",
     "clearSearch": "Limpar a pesquisa",
     "advancedSearch": "Pesquisa avançada",
